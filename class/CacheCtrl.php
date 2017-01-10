@@ -96,4 +96,4 @@ class CacheCtrl {
             return $i[0];
         }
     }
-}?>
+}
