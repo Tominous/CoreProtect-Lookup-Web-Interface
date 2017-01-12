@@ -21,8 +21,6 @@ class ParseInput {
         $date, $limit, $offset, $rollback,
     // boolean
         $exclusiveBlock, $exclusiveUser, $ascendingDate,
-    // Error handling
-        $warning, $error;
 
     // actions
     const A_BLOCK = "block",
@@ -34,9 +32,6 @@ class ParseInput {
         A_SESSION = "session",
         A_USERNAME = "username_log";
     
-    // errors
-    const WARN_COMMAND_NO_DATE = 1;
-
     /**
      * Input parser
      * 
@@ -69,7 +64,6 @@ class ParseInput {
                             str_replace(",","",$tmp[1]));
                     if (empty($input['t'])) {
                         $input['t'] = time();
-                        $this->warning |= self::ERROR_CMD_NO_DATE;
                     }
                     foreach($tmp1 as $v) {
                         $v = preg_split("/(?<=\d)(?=[wdhms])/",$v,2);

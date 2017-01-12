@@ -54,7 +54,7 @@ class DataIDAccess {
         $this->legacy = $serverConfig['legacy'];
         
         // Load 
-        foreach($this::ALL as $d) if(file_exists($this->fr.$d.".php")) {
+        foreach(self::$ALL as $d) if(file_exists($this->fr.$d.".php")) {
             $e = $d."Db";
             $this->$e = require($this->fr.$d.".php");
         }
@@ -63,7 +63,7 @@ class DataIDAccess {
     public function __destruct() {
         if (!is_dir(__DIR__.'/'.$this->fr))
             mkdir(__DIR__.'/'.$this->fr);
-        foreach($this::ALL as $v) {
+        foreach(self::$ALL as $v) {
             $e = $v."Lookup";
             if(!empty($this->$v) || !empty($this->$e)) {
                 // Save $db to file
