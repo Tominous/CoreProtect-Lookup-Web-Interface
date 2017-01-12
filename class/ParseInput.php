@@ -1,6 +1,7 @@
 <?php
 /**
- * ParseInput class TODO: Complete migration
+ * ParseInput class
+ * State: Getter implementation needed
  * 
  * CoreProtect Lookup Web Interface
  * @author      Simon Chuu <simonorj@outlook.com>
@@ -8,79 +9,172 @@
  * @license     MIT
  */
 
+include_once "DataIDAccess.php";
+
 class ParseInput {
     // string[]
-    private $action, $block, $user, $keyword;
+    private $action, $block, $user, $keyword,
+    // a, b, u, kw
     // int[]
-    private $cornerLo, $cornerHi;
+        $cornerLo, $cornerHi,
     // int
-    private $date, $limit, $offset;
+        $date, $limit, $offset, $rollback,
     // boolean
-    private $exclusiveBlock, $exclusiveUser, $ascendingDate;
-    // other
-    private $rollback;
-    
+        $exclusiveBlock, $exclusiveUser, $ascendingDate,
+    // Error handling
+        $warning, $error;
+
     // actions
-    const A_BLOCK = "block";
-    const A_CHAT = "chat";
-    const A_CLICK = "click";
-    const A_CONTAINER = "container";
-    const A_COMMAND = "command";
-    const A_KILL = "kill";
-    const A_SESSION = "session";
-    const A_USERNAME = "username_log";
+    const A_BLOCK = "block",
+        A_CHAT = "chat",
+        A_CLICK = "click",
+        A_CONTAINER = "container",
+        A_COMMAND = "command",
+        A_KILL = "kill",
+        A_SESSION = "session",
+        A_USERNAME = "username_log";
     
-    // form origin
-    const ORIGIN_HTML_FORM = 0;
-    const ORIGIN_COREPROTECT_LOOKUP_COMMAND = 1;
-    
-    public function __construct($request, $origin, $c) {
-        if ($origin === ORIGIN_HTML_FORM)
-            parseHTMLForm($request, $c);
-        elseif ($origin === ORIGIN_COREPROTECT_LOOKUP_COMMAND)
-            // TODO: this stuff
-            ;
-    }
-    
+    // errors
+    const WARN_COMMAND_NO_DATE = 1;
+
     /**
-     * HTML GET/POST Form parser
+     * Input parser
      * 
      * @param string[] $input   The input as fetched directly from $_REQUEST
-     * @param mixed[]  $c       Configuration input for defaults
-     * 
-     * @return boolean true on success, false on failure.  Warnings will be
-     *         considered as a pass (success).
+     * @param mixed[]  $c       Configuration input for grabbing defaults
      */
-    public function parseHTMLForm($input, $c) {
-        function checkArray($var, $input, $ifNone = null) {
+    public function __construct($input, $c, $dia) {
+        // parse input
+        if (isset($input['cmd'])) {
+            $input['cmd'] = explode(" ", $input);
+            foreach ($input as $v) {
+                $tmp = explode(":", $v, 2);
+                // Possible first indexes: u t r a b e
+                // info passed down straight from $input: c1
+                switch ($tmp[0]) {
+                case 'a':
+                    // TODO: Implement all these possible inputs
+                    // block +block -block click container +container -container
+                    // kill chat session +session -session username
+                case 'b':
+                case 'u':
+                    $tmp[1] = explode(",", $tmp[1]);
+                    foreach ($tmp[1] as $tmp1)
+                        if ($tmp1 !== "")
+                            $input[$tmp[0]][] = $tmp1;
+                    break;
+                case 't':
+                    // split at the non-character between letter and digit
+                    $tmp1 = preg_split("/(?<=[wdhms])(?=\d)/",
+                            str_replace(",","",$tmp[1]));
+                    if (empty($input['t'])) {
+                        $input['t'] = time();
+                        $this->warning |= self::ERROR_CMD_NO_DATE;
+                    }
+                    foreach($tmp1 as $v) {
+                        $v = preg_split("/(?<=\d)(?=[wdhms])/",$v,2);
+                        switch($v[1]) {
+                            case "w": $input['t'] -= $v[0]*604800; break;
+                            case "d": $input['t'] -= $v[0]*86400;  break;
+                            case "h": $input['t'] -= $v[0]*3600;   break;
+                            case "m": $input['t'] -= $v[0]*60;     break;
+                            case "s": $input['t'] -= $v[1];        break;
+                        }
+                    }
+                    break;
+                case 'r':
+                    $input['r'] = $tmp[1];
+                    break;
+                case 'e':
+                    $tmp[1] = explode(",", $tmp[1]);
+                    foreach ($tmp[1] as $tmp1) {
+                        // differenciate between user and block.
+                        if ($DIA->getId($tmp1, DataIDAccess::USER) !== NULL) {
+                            // Specified excludes is a user.
+                            if ($input['eu'] === "on") {
+                                
+                                // Exclusive is on. now check for duplication.
+                                if (!array_search($tmp1, $input['u']))
+                                    $input['u'][] = $tmp1;
+                                
+                            } elseif (empty($input['u'])) {
+                                
+                                // Empty. Initialize it.
+                                $input['eu'] = "on";
+                                $input['u'][] = $tmp1;
+                                
+                            } elseif (($k = array_search($tmp1, $input['u'])
+                                    !== false)) {
+                                
+                                // User is in the array, and 'eu' DNE.
+                                unset($input['u'][$k]);
+                                
+                            }
+                            continue;
+                        } elseif ($DIA->getId($tmp1, DataIDAccess::BLOCK) !== NULL) {
+                            
+                            // Specified excludes is a block.
+                            if ($input['eb'] === "on") {
+                                
+                                // Exclusive is on. now check for duplication.
+                                if (!array_search($tmp1, $input['b']))
+                                    $input['b'][] = $tmp1;
+                                
+                            } elseif (empty($input['b'])) {
+                                
+                                // Empty. Initialize it.
+                                $input['eb'] = "on";
+                                $input['b'][] = $tmp1;
+                                
+                            } elseif (($k = array_search($tmp1, $input['u'])
+                                    !== false)) {
+                                
+                                // User is in the array, and 'eu' DNE.
+                                unset($input['b'][$k]);
+                                
+                            }
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+        
+        function checkArray($var, $ifNone = null, $trimEmpty = false) {
+            if (!is_array($var))
+                return $ifNone;
+            
             // empty() does not support functions for PHP under v5.5.0.
-            $emptyValTest = array_filter($val,function($ke){
+            $trimTest = array_filter($var,function($ke){
                 return $ke !== "";
             });
             
-            if (!empty($emptyValTest) && array_key_exists($var,$in)
-                    && is_array($in[$var]))
-                return $in[$var];
-
-            return $ifNone;
+            return empty($trimTest) ? $ifNone : $trimEmpty ? $trimTest : $var;
         }
-        $action = checkArray('a',$input,array('block'));
-        $block  = checkArray('b',$input);
-        $user   = checkArray('u',$input);
         
-        // code for $corner1 and $corner2
-        $corner1 = array();
-        $corner2 = array();
-        $l1 = checkArray('xyz',$input);
+        function checkString($var, $ifNone = null) {
+            return $var === "" ? $ifNone : $var;
+        }
+        
+        function checkBoolean($var) {
+            return $var === "on";
+        }
+        
+        $this->action = checkArray($input['a'], array('block'));
+        $this->block  = checkArray($input['b']);
+        $this->user   = checkArray($input['u']);
+        
+        // code for $cornerLo and $cornerHi
+        $l1 = checkArray($input['c1']);
         if ($l1 === null) {
-            $cornerLo = $cornerHi = null;
+            $this->cornerLo = $this->cornerHi = null;
         } else {
             $l1 = array_map('intval', $l1);
 
-            $l2 = checkArray('xyz2',$input);
+            $l2 = checkArray($input['c2']);
             if ($l2 === null) {
                 // one-block search
-                $cornerLo = $cornerHi = $l1;
+                $this->cornerLo = $this->cornerHi = $l1;
             } else {
                 // coordinate 2: figure out if radius or second corner.
                 if ($l2[0] !== ""
@@ -88,12 +182,12 @@ class ParseInput {
                         && $l2[2] === "") {
                     // radius
                     $l2 = intval($l2[0]);
-                    $cornerLo = array(
+                    $this->cornerLo = array(
                         $l1[0] - $l2,
                         $l1[1] - $l2,
                         $l1[2] - $l2
                     );
-                    $cornerHi = array(
+                    $this->cornerHi = array(
                         $l1[0] + $l2,
                         $l1[1] + $l2,
                         $l1[2] + $l2,
@@ -102,12 +196,12 @@ class ParseInput {
                 else {
                     $l2 = array_map('intval', $l2);
                     // Second corner
-                    $cornerLo = array(
+                    $this->cornerLo = array(
                         min($l1[0], $l2[0]),
                         min($l1[1], $l2[0]),
                         min($l1[2], $l2[0])
                     );
-                    $cornerHi = array(
+                    $this->cornerHi = array(
                         max($l1[0], $l2[0]),
                         max($l1[1], $l2[1]),
                         max($l1[2], $l2[2])
@@ -116,103 +210,17 @@ class ParseInput {
             }
         }
         
-        //$date
-        //$limit
-        //$offset
-        //$exclusiveBlock
-        //$exclusiveUser
-        //$ascendingDate
-        //$rollback
-        //$keyword
+        // Convert to int time from possible 0000-00-00T00:00
+        $this->date = is_numeric(checkString($input['t'], time()))
+                ? intval($t) : strtotime($t);
         
-        /* Old way, defunct.
-        $VARS = array(
-            'int[]'    => array("xyz", "xyz2"),
-            'string'   => array("t","wid"),
-            'int'      => array("r","rollback","lim","offset"),
-            'boolean'  => array("unixtime","asendt")
-        );
-        
-        foreach ($input as $k => $v) {
-            
-            // Emptiness check
-            if (is_string($v) && $v === "") continue; // String is empty.
-            if (is_array($v)) {
-            }
-            
-
-            // Matching
-            switch ($key) {
-            case "a":
-            case "b":
-            case "e":
-            case "u":
-                if (is_array($v)) $ret[$k] = $val;
-                break;
-            case "xyz":
-            case "xyz2":
-                if (is_array($v)) {
-                    // coordinate 2: figure out if radius or second corner.
-                    if ($k === "xyz2" && $v[0] !== ""
-                            && $v[1] === ""
-                            && $v[2] === "")
-                        // xyz2: second corner or radius
-                        $r = intval($val[0]);
-                    else
-                        $$k = array_map('intval', $val);
-                }
-                break;
-            case "wid";
-                $$k = intval($val);
-                break;
-            case "t":
-                // Convert to int time from possible 0000-00-00T00:00
-                $$k = is_numeric($v) ? intval($v) : strtotime($v);
-            case "r":
-            case "rollback":
-            case "lim":
-            case "offset":
-                if ($val !== "")
-                    $$k = intval($val);
-            case "unixtime":
-            case "asendt":
-                if ($val === "on") $$k = true;
-            case "keyword":
-                // keyword search, contains commas as delimiter
-                if ($val !== "") $q[$key] = str_getcsv($val); // TODO: SQL Escape
-            }
-        }
-        
-        // Defaults if the required parts of the query is empty:
-        if (empty($a))         $q['a'] = array("block");
-        if (!isset($q['asendt']))   $q['asendt'] = false;
-        if (!isset($q['unixtime'])) $q['unixtime'] = false;
-        if (!isset($q['offset']))   $q['offset'] = 0;
-        if (!isset($q['lim'])) {
-            if (isset($q['offset']) && $q['offset'] !== 0)
-                $q['lim'] = $c['form']['loadMoreLimit'];
-            else
-                $q['lim'] = $c['form']['limit'];
-        }
-
-        return $q;
-        */
+        $this->offset = intval(checkString($input['os'], 0));
+        $this->limit  = intval(checkString($input['lm'],
+                $offset === 0 ? 50 : 20));// TODO: Use config val
+        $this->rollback = intval(checkString($input['rb']));
+        $this->exclusiveBlock = checkBoolean($input['eb']);
+        $this->exclusiveUser  = checkBoolean($input['eu']);
+        $this->ascendingDate  = checkBoolean($input['rt']);
+        $this->keyword = $input !== "" ? null : str_getcsv($val); // TODO: SQL Escape
     }
-    
-    
-        //$action
-        //$block
-        //$user
-        //$block
-        //$location
-        //$keyword
-        //$date
-        //$limit
-        //$offset
-        //$exclusiveBlock
-        //$exclusiveUser
-        //$ascendingDate
-        //$rollback
-        
-
 }

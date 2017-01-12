@@ -1,26 +1,40 @@
 <?php
-// CoLWI v0.9.3
-// CacheCtrl PHP class
-// Copyright (c) 2015-2016 SimonOrJ
+/**
+ * DataIDAccess class
+ * 
+ * CoreProtect Lookup Web Interface
+ * @author      Simon Chuu <simonorj@outlook.com>
+ * @copyright   Simon Chuu, 2015-2017
+ * @license     MIT
+ */
 
-// __construct ( string server, PDO codb, array serverConfig )
-//   returns nothing.
-// __destruct ( void )
-//   returns nothing.
-// array error
-//   contains error data when error happens. (To be replaced with "getStatus")
-// getValue ( string from, int id )
-//   returns corresponding value in string
-// getId ( string from, string value )
-//   returns corresponding id in integer
+/**
+ * __construct ( string server, PDO codb, array serverConfig )
+ *   returns nothing.
+ * __destruct ( void )
+ *   returns nothing.
+ * array error
+ *   contains error data when error happens. (To be replaced with "getStatus")
+ * getValue ( string from, int id )
+ *   returns corresponding value in string
+ * getId ( string from, string value )
+ *   returns corresponding id in integer
+ */
 
 // Available "string from" values:
 // art, entity, material, user, world
 
 // TODO: Make this update username changes somehow.
-class CacheCtrl {
-    private $ALL = ["art","entity","material","user","world"],
-            $artDb = [],
+class DataIDAccess {
+    const ART = "art",
+        ENTITY = "entity",
+        BLOCK = "material",
+        USER = "user",
+        WORLD = "world";
+    
+    private static $ALL = [self::ART, self::ENTITY, self::BLOCK,
+            self::USER, self::WORLD];
+    private $artDb = [],
             $entityDb = [],
             $materialDb = [],
             $userDb = [],
@@ -40,7 +54,7 @@ class CacheCtrl {
         $this->legacy = $serverConfig['legacy'];
         
         // Load 
-        foreach($this->ALL as $d) if(file_exists($this->fr.$d.".php")) {
+        foreach($this::ALL as $d) if(file_exists($this->fr.$d.".php")) {
             $e = $d."Db";
             $this->$e = require($this->fr.$d.".php");
         }
@@ -49,7 +63,7 @@ class CacheCtrl {
     public function __destruct() {
         if (!is_dir(__DIR__.'/'.$this->fr))
             mkdir(__DIR__.'/'.$this->fr);
-        foreach($this->ALL as $v) {
+        foreach($this::ALL as $v) {
             $e = $v."Lookup";
             if(!empty($this->$v) || !empty($this->$e)) {
                 // Save $db to file
