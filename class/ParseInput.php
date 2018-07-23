@@ -9,7 +9,7 @@
  * @license     MIT
  */
 
-include_once "DataIDAccess.php";
+include_once "DataCache.php";
 
 class ParseInput {
     // string[]
@@ -20,7 +20,7 @@ class ParseInput {
     // int
         $date, $limit, $offset, $rollback,
     // boolean
-        $exclusiveBlock, $exclusiveUser, $ascendingDate,
+        $exclusiveBlock, $exclusiveUser, $ascendingDate;
 
     // actions
     const A_BLOCK = "block",
