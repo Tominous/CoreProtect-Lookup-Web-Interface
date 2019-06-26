@@ -28,7 +28,7 @@
 //   $Cc, $Cm, $codb, $filter, $out, $q, $status, $timer, $where
 
 // Testing script
-//error_reporting(-1);ini_set('display_errors', 'On');
+error_reporting(-1);ini_set('display_errors', 'On');
 
 // Record start time
 $timer = microtime(true);
@@ -321,10 +321,10 @@ if(isset($q['keyword'])) {
         $filter['keyword'][] = "(".implode(" AND ",$terms).")";
     }
     $filter['keyword'] = "(".implode(" OR ",$filter['keyword']).")";
-    /*if(in_array("block",$a,true)) {
+    if(in_array("block",$a,true)) {
         foreach($keywords as $val) $serachSign[] = "(line_1 LIKE '%".$val."%' OR line_2 LIKE '%".$val."%' OR line_3 LIKE '%".$val."%' OR line_4 LIKE '%".$val."%')";
         $searchSign = "(".implode(" AND ",$searchSign).")";
-    }*/
+    }
 }
 else $filter['keyword'] = false;
 
@@ -440,7 +440,7 @@ $lookup->bindValue($out[0]["SQLqs"]+2, $q["lim"], PDO::PARAM_INT);
 if ($lookup->execute()) {
     $out[0]["status"] = 0;
     $out[0]["reason"] = "Request successful";
-//    $status["rows"] = $numrows;
+    $status["rows"] = $numrows;
     // Code Sanitaizer
     while($r = $lookup->fetch(PDO::FETCH_ASSOC)) {
         if ($r["table"] !== "username_log") $r["user"] = $Cc->getValue($r["user"],"user");
