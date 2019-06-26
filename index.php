@@ -9,7 +9,7 @@
  */
 
 // Testing script
-//error_reporting(-1);ini_set('display_errors', 'On');
+error_reporting(-1);ini_set('display_errors', 'On');
 
 // Get the configuration variable.
 $c = require "config.php";
@@ -39,7 +39,7 @@ if ($gr = !empty($_GET['a'])) { // I forgot what "gr" stands for...
         $moreQuery['offet'] = $_GET['lim'];
         unset($moreQuery['lim']);
     }
-    /*
+    
     // Get output from conn.php
     include "conn.php";
     
@@ -53,7 +53,7 @@ if ($gr = !empty($_GET['a'])) { // I forgot what "gr" stands for...
     
     // TODO: Port JS to PHP
     $tableOutput = $out;
-    */
+    
 }
 // TODO: Automatically get result thingies.
 ?><!-- CoreProtect LWI by SimonOrJ. All Rights Reserved. -->
